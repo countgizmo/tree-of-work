@@ -64,6 +64,8 @@ func initialModel(bareRepoPath string) model {
 
 type okMsg int
 type errMsg struct{err error}
+type cursorUpdMsg int
+type listMsg []worktree
 
 func (e errMsg) Error() string {
 	return e.err.Error()
@@ -114,7 +116,15 @@ func listTrees(git string, bareRepoPath string) tea.Cmd {
 	}
 }
 
-type listMsg []worktree
+func fixCursorPosition(m model) tea.Cmd {
+	return func() tea.Msg {
+		if m.cursor >= len(m.worktrees) {
+			m.cursor = len(m.worktrees) - 1
+		}
+
+		return cursorUpdMsg(m.cursor)
+	}
+}
 
 func (m model) Init() tea.Cmd {
 	return listTrees(m.gitPath, m.bareRepoPath)
@@ -128,6 +138,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case listMsg:
 		m.worktrees = msg
+		return m, fixCursorPosition(m)
+
+	case cursorUpdMsg:
+		m.cursor = int(msg)
 
 	case tea.KeyMsg:
 		switch msg.String() {
