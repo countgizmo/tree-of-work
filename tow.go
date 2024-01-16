@@ -102,6 +102,7 @@ func deleteTrees(m model) tea.Cmd {
 	}
 }
 
+//TODO(evgheni): sort by oldest
 func listTrees(git string, bareRepoPath string) tea.Cmd {
 	return func() tea.Msg {
 		worktreeList := []string{"-C", bareRepoPath, "worktree", "list"}
