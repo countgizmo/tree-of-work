@@ -24,8 +24,6 @@ func issueCommand(command string, args []string) ([]string, error) {
 		return nil, err
 	}
 
-	log.Println(string(out))
-
 	lines := strings.Split(string(out), "\n")
 	return lines, nil
 }
@@ -73,24 +71,17 @@ func (e errMsg) Error() string {
 
 func deleteTrees(m model) tea.Cmd {
 	return func() tea.Msg {
-		trees := []worktree{}
-
-		for k := range m.selected{
-			trees = append(trees, m.worktrees[k])
-		}
-
-		for _, tree := range trees {
-			log.Println("deleting tree", tree.name)
+		for k := range m.selected {
+			tree := m.worktrees[k]
 			removeWorktree := []string{"-C", m.bareRepoPath, "worktree", "remove", tree.name}
 			_, removeErr := issueCommand(m.gitPath, removeWorktree)
-			log.Println(removeWorktree)
 			if removeErr != nil {
 				return errMsg{removeErr}
 			}
 
-			log.Println("deleting branch", tree.branch)
+			delete(m.selected, k)
+
 			removeBranch := []string{"-C", m.bareRepoPath, "branch", "-d", tree.branch}
-			log.Println(removeBranch)
 			_, removeBranchErr := issueCommand(m.gitPath, removeBranch)
 			if removeBranchErr != nil {
 				return errMsg{removeBranchErr}
@@ -144,10 +135,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "r":
 			return m, listTrees(m.gitPath, m.bareRepoPath)
 
-			// TODO(evgheni): chain list _after_ delete finishes
-			// TODO(evgheni): reset selected map
 		case "d":
-			return m, tea.Batch(
+			return m, tea.Sequence(
 				deleteTrees(m),
 				listTrees(m.gitPath, m.bareRepoPath))
 
@@ -224,7 +213,6 @@ func main() {
 
 	bareRepoPath := os.Args[1]
 
-
 	if len(os.Getenv("DEBUG")) > 0 {
 		f, err := tea.LogToFile("debug.log", "debug")
 		if err != nil {
@@ -233,8 +221,6 @@ func main() {
 		}
 		defer f.Close()
 	}
-
-
 
 	p := tea.NewProgram(initialModel(bareRepoPath))
 	if _, err := p.Run(); err != nil {
