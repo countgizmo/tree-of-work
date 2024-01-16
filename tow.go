@@ -14,6 +14,7 @@ type worktree struct {
 	name   string
 	head   string
 	branch string
+	modifiedAt string
 }
 
 func issueCommand(command string, args []string) ([]string, error) {
@@ -33,10 +34,17 @@ func parseLine(line string) worktree {
 	path := chunks[0]
 	path_parts := strings.Split(path, "/")
 
+	dateArgs := []string{"-I", "-r", path}
+	date, dateErr := issueCommand("date", dateArgs)
+	if dateErr != nil {
+		log.Fatal("date failed", dateErr)
+	}
+
 	return worktree{
 		name:   path_parts[len(path_parts)-1],
 		head:   chunks[1],
 		branch: chunks[2][1:len(chunks[2])-1],
+		modifiedAt: date[0],
 	}
 }
 
@@ -205,7 +213,7 @@ func (m model) View() string {
 		}
 
 		// Render the row
-		s += fmt.Sprintf("%s [%s] %-40s\t%-40s\n", cursor, checked, worktree.name, worktree.branch)
+		s += fmt.Sprintf("%s [%s] %-40s\t%-40s\t%-40s\n", cursor, checked, worktree.name, worktree.branch, worktree.modifiedAt)
 	}
 
 	// The footer
