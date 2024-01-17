@@ -205,7 +205,7 @@ func (m model) View() string {
 		return fmt.Sprintf("\nWe had some trouble: %v\n\n", m.err)
 	}
 	// The header
-	s := "Your worktrees\n\n"
+	s := fmt.Sprintf("Your worktrees: [%d/%d]\n\n", m.cursor+1, len(m.worktrees))
 
 	for i, worktree := range m.worktrees {
 
@@ -226,7 +226,7 @@ func (m model) View() string {
 	}
 
 	// The footer
-	s += "\nPress q to quit.\n"
+	s += "\nq: Quit, Enter/Space: Select, d: Delete\n"
 
 	return s
 }
