@@ -5,17 +5,24 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"sort"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
 )
 
 type worktree struct {
-	name   string
-	head   string
-	branch string
+	name       string
+	head       string
+	branch     string
 	modifiedAt string
 }
+
+type ByModifiedAt []worktree
+
+func (a ByModifiedAt) Len() int           { return len(a) }
+func (a ByModifiedAt) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
+func (a ByModifiedAt) Less(i, j int) bool { return a[i].modifiedAt < a[j].modifiedAt }
 
 func issueCommand(command string, args []string) ([]string, error) {
 	cmd := exec.Command(command, args...)
@@ -41,20 +48,20 @@ func parseLine(line string) worktree {
 	}
 
 	return worktree{
-		name:   path_parts[len(path_parts)-1],
-		head:   chunks[1],
-		branch: chunks[2][1:len(chunks[2])-1],
+		name:       path_parts[len(path_parts)-1],
+		head:       chunks[1],
+		branch:     chunks[2][1 : len(chunks[2])-1],
 		modifiedAt: date[0],
 	}
 }
 
 type model struct {
-	gitPath  string
+	gitPath      string
 	bareRepoPath string
-	worktrees []worktree
-	cursor    int
-	selected  map[int]struct{}
-	err error
+	worktrees    []worktree
+	cursor       int
+	selected     map[int]struct{}
+	err          error
 }
 
 func initialModel(bareRepoPath string) model {
@@ -64,14 +71,14 @@ func initialModel(bareRepoPath string) model {
 	}
 
 	return model{
-		gitPath: git,
+		gitPath:      git,
 		bareRepoPath: bareRepoPath,
-		selected:  make(map[int]struct{}),
+		selected:     make(map[int]struct{}),
 	}
 }
 
 type okMsg int
-type errMsg struct{err error}
+type errMsg struct{ err error }
 type cursorUpdMsg int
 type listMsg []worktree
 
@@ -102,7 +109,6 @@ func deleteTrees(m model) tea.Cmd {
 	}
 }
 
-//TODO(evgheni): sort by oldest
 func listTrees(git string, bareRepoPath string) tea.Cmd {
 	return func() tea.Msg {
 		worktreeList := []string{"-C", bareRepoPath, "worktree", "list"}
@@ -120,6 +126,8 @@ func listTrees(git string, bareRepoPath string) tea.Cmd {
 			}
 			worktrees[i-1] = parseLine(line)
 		}
+
+		sort.Sort(ByModifiedAt(worktrees))
 
 		return listMsg(worktrees)
 	}
@@ -223,6 +231,13 @@ func (m model) View() string {
 	return s
 }
 
+// TODO(evgheni): if no path is specified try the current directory.
+//
+//	If it's not a bare directory _than_ print out the usage.
+//	Also update the usage message then.
+//
+// This can be useful if the tow is in path and you are in your bare repo already
+// instead of calling `git worktree` you call `tow` and that's it.
 func usage() {
 	fmt.Println("Usage: tree-of-work <path-to-bare-repo>")
 }
