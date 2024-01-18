@@ -19,7 +19,7 @@ type worktree struct {
 	modifiedAt string
 }
 
-type ByModifiedAt []worktree
+type ByModifiedAt map[int]worktree
 
 func (a ByModifiedAt) Len() int           { return len(a) }
 func (a ByModifiedAt) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
@@ -59,7 +59,7 @@ func parseLine(line string) worktree {
 type model struct {
 	gitPath      string
 	bareRepoPath string
-	worktrees    []worktree
+	worktrees    map[int]worktree
 	cursor       int
 	selected     map[int]struct{}
 	err          error
@@ -79,10 +79,9 @@ func initialModel(bareRepoPath string) model {
 	}
 }
 
-type okMsg int
+type deleteMsg int
 type errMsg struct{ err error }
-type cursorUpdMsg int
-type listMsg []worktree
+type listMsg map[int]worktree
 
 func (e errMsg) Error() string {
 	return e.err.Error()
@@ -98,7 +97,7 @@ func deleteTrees(m model) tea.Cmd {
 				return errMsg{removeErr}
 			}
 
-			delete(m.selected, k)
+			//delete(m.selected, k)
 
 			removeBranch := []string{"-C", m.bareRepoPath, "branch", "-d", tree.branch}
 			_, removeBranchErr := issueCommand(m.gitPath, removeBranch)
@@ -107,7 +106,7 @@ func deleteTrees(m model) tea.Cmd {
 			}
 		}
 
-		return okMsg(0)
+		return deleteMsg(0)
 	}
 }
 
@@ -120,7 +119,7 @@ func listTrees(git string, bareRepoPath string) tea.Cmd {
 			return errMsg{err}
 		}
 
-		worktrees := make([]worktree, len(output)-2)
+		worktrees := make(map[int]worktree, len(output)-2)
 
 		for i, line := range output {
 			if i == 0 || len(line) == 0 {
@@ -132,16 +131,6 @@ func listTrees(git string, bareRepoPath string) tea.Cmd {
 		sort.Sort(ByModifiedAt(worktrees))
 
 		return listMsg(worktrees)
-	}
-}
-
-func fixCursorPosition(m model) tea.Cmd {
-	return func() tea.Msg {
-		if m.cursor >= len(m.worktrees) {
-			m.cursor = len(m.worktrees) - 1
-		}
-
-		return cursorUpdMsg(m.cursor)
 	}
 }
 
@@ -157,10 +146,17 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case listMsg:
 		m.worktrees = msg
-		return m, fixCursorPosition(m)
 
-	case cursorUpdMsg:
-		m.cursor = int(msg)
+	// After delete operations ran, we need to update
+	// the model accordingly otherwise the view will break.
+	case deleteMsg:
+		for k := range m.selected {
+			delete(m.selected, k)
+			delete(m.worktrees, k)
+		}
+		if m.cursor >= len(m.worktrees) {
+			m.cursor = len(m.worktrees) - 1
+		}
 
 	case tea.KeyMsg:
 		switch msg.String() {
@@ -233,11 +229,6 @@ func (m model) View() string {
 		end = dataRows
 		if m.cursor >= dataRows {
 			offset := (m.cursor + 1) - dataRows
-
-			if (m.cursor + 1) >= len(m.worktrees) {
-				offset = len(m.worktrees) - dataRows
-			}
-
 			if offset > 0 {
 				start = start + offset
 				end = start + dataRows
