@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"text/tabwriter"
 
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -96,8 +97,6 @@ func deleteTrees(m model) tea.Cmd {
 			if removeErr != nil {
 				return errMsg{removeErr}
 			}
-
-			//delete(m.selected, k)
 
 			removeBranch := []string{"-C", m.bareRepoPath, "branch", "-d", tree.branch}
 			_, removeBranchErr := issueCommand(m.gitPath, removeBranch)
@@ -219,7 +218,18 @@ func (m model) View() string {
 	}
 
 	// The header
-	s := fmt.Sprintf("Your worktrees: [%d/%d]\n\n", m.cursor+1, len(m.worktrees))
+	current := m.cursor + 1
+	if len(m.worktrees) == 0 {
+		current = 0
+	}
+
+	s := fmt.Sprintf("Your worktrees: [%d/%d]\n\n", current, len(m.worktrees))
+
+	// TODO(evgheni): refactor to render* functions for each part of the view
+	//                aka: subviews?
+	// The table
+	var tabStrings strings.Builder
+	tableWriter := tabwriter.NewWriter(&tabStrings, 20, 4, 2, '\t', 0)
 
 	dataRows := rows - 5
 	start := 0
@@ -252,8 +262,10 @@ func (m model) View() string {
 		}
 
 		// Render the row
-		s += fmt.Sprintf("%s [%s] %-40s\t%-40s\t%-40s\n", cursor, checked, worktree.name, worktree.branch, worktree.modifiedAt)
+		fmt.Fprintf(tableWriter, "%s [%s] %s\t%s\t%s\t\n", cursor, checked, worktree.name, worktree.branch, worktree.modifiedAt)
 	}
+	tableWriter.Flush()
+	s += tabStrings.String()
 
 	// The footer
 	s += "\nq: Quit, Enter/Space: Select, d: Delete, r: Refresh\n"
