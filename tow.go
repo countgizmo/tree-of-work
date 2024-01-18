@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"sort"
+	"strconv"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -71,6 +72,7 @@ func initialModel(bareRepoPath string) model {
 	}
 
 	return model{
+		cursor:       0,
 		gitPath:      git,
 		bareRepoPath: bareRepoPath,
 		selected:     make(map[int]struct{}),
@@ -174,7 +176,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "ctrl+c", "q":
 			return m, tea.Quit
 
-			// TODO(evgheni): add scrolling
 		case "up", "k":
 			if m.cursor > 0 {
 				m.cursor--
@@ -200,14 +201,52 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+var sizeCmd = []string{"stty", "size"}
+
 func (m model) View() string {
 	if m.err != nil {
 		return fmt.Sprintf("\nWe had some trouble: %v\n\n", m.err)
 	}
+
+	cmd := exec.Command("stty", "size")
+	cmd.Stdin = os.Stdin
+	out, sizeErr := cmd.Output()
+
+	var rows = 40
+	var columns = 80
+
+	if sizeErr == nil {
+		fields := strings.Fields(string(out))
+		rows, _ = strconv.Atoi(fields[0])
+		columns, _ = strconv.Atoi(fields[1])
+		log.Printf("rows = %d columns = %d\n", rows, columns)
+	}
+
 	// The header
 	s := fmt.Sprintf("Your worktrees: [%d/%d]\n\n", m.cursor+1, len(m.worktrees))
 
-	for i, worktree := range m.worktrees {
+	dataRows := rows - 5
+	start := 0
+	end := len(m.worktrees)
+
+	if end > 0 && dataRows < len(m.worktrees) {
+		end = dataRows
+		if m.cursor >= dataRows {
+			offset := (m.cursor + 1) - dataRows
+
+			if (m.cursor + 1) >= len(m.worktrees) {
+				offset = len(m.worktrees) - dataRows
+			}
+
+			if offset > 0 {
+				start = start + offset
+				end = start + dataRows
+			}
+		}
+	}
+
+	for i := start; i < end; i++ {
+		worktree := m.worktrees[i]
 
 		// Is the cursor pointing at this choice?
 		cursor := " " // no cursor
@@ -226,7 +265,7 @@ func (m model) View() string {
 	}
 
 	// The footer
-	s += "\nq: Quit, Enter/Space: Select, d: Delete\n"
+	s += "\nq: Quit, Enter/Space: Select, d: Delete, r: Refresh\n"
 
 	return s
 }
