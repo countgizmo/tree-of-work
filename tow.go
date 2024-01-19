@@ -196,25 +196,26 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-var sizeCmd = []string{"stty", "size"}
-
-func (m model) View() string {
-	if m.err != nil {
-		return fmt.Sprintf("\nWe had some trouble: %v\n\n", m.err)
-	}
-
+func getTerminalSize() (int, int) {
 	cmd := exec.Command("stty", "size")
 	cmd.Stdin = os.Stdin
 	out, sizeErr := cmd.Output()
 
-	var rows = 40
-	var columns = 80
+	rows := 40
+	columns := 80
 
 	if sizeErr == nil {
 		fields := strings.Fields(string(out))
 		rows, _ = strconv.Atoi(fields[0])
 		columns, _ = strconv.Atoi(fields[1])
-		log.Printf("rows = %d columns = %d\n", rows, columns)
+	}
+
+	return rows, columns
+}
+
+func (m model) View() string {
+	if m.err != nil {
+		return fmt.Sprintf("\nWe had some trouble: %v\n\n", m.err)
 	}
 
 	// The header
@@ -222,6 +223,8 @@ func (m model) View() string {
 	if len(m.worktrees) == 0 {
 		current = 0
 	}
+
+	rows, _ := getTerminalSize()
 
 	s := fmt.Sprintf("Your worktrees: [%d/%d]\n\n", current, len(m.worktrees))
 
