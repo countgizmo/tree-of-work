@@ -213,27 +213,24 @@ func getTerminalSize() (int, int) {
 	return rows, columns
 }
 
-func (m model) View() string {
-	if m.err != nil {
-		return fmt.Sprintf("\nWe had some trouble: %v\n\n", m.err)
-	}
-
-	// The header
+func getHeader(m model) string {
 	current := m.cursor + 1
 	if len(m.worktrees) == 0 {
 		current = 0
 	}
 
-	rows, _ := getTerminalSize()
+	return fmt.Sprintf("Your worktrees: [%d/%d]\n\n", current, len(m.worktrees))
+}
 
-	s := fmt.Sprintf("Your worktrees: [%d/%d]\n\n", current, len(m.worktrees))
-
-	// TODO(evgheni): refactor to render* functions for each part of the view
-	//                aka: subviews?
-	// The table
+// BUG: When testing on real bare repo some names are too long
+// Try truncating after max len
+// Add i command for info to get more info
+// Maybe it's time to switch to using Bubbles components
+func getTable(m model) string {
 	var tabStrings strings.Builder
-	tableWriter := tabwriter.NewWriter(&tabStrings, 20, 4, 2, '\t', 0)
+	tableWriter := tabwriter.NewWriter(&tabStrings, 0, 4, 0, '\t', 0)
 
+	rows, _ := getTerminalSize()
 	dataRows := rows - 5
 	start := 0
 	end := len(m.worktrees)
@@ -248,6 +245,9 @@ func (m model) View() string {
 			}
 		}
 	}
+
+	// Render table headers
+	fmt.Fprint(tableWriter, "      Worktrees\tBranch names\tModified at\t\n")
 
 	for i := start; i < end; i++ {
 		worktree := m.worktrees[i]
@@ -268,12 +268,23 @@ func (m model) View() string {
 		fmt.Fprintf(tableWriter, "%s [%s] %s\t%s\t%s\t\n", cursor, checked, worktree.name, worktree.branch, worktree.modifiedAt)
 	}
 	tableWriter.Flush()
-	s += tabStrings.String()
+	return tabStrings.String()
+}
 
-	// The footer
-	s += "\nq: Quit, Enter/Space: Select, d: Delete, r: Refresh\n"
+func getFooter() string {
+	return "\nq: Quit, Enter/Space: Select, d: Delete, r: Refresh\n"
+}
 
-	return s
+func (m model) View() string {
+	if m.err != nil {
+		return fmt.Sprintf("\nWe had some trouble: %v\n\n", m.err)
+	}
+
+	output := getHeader(m)
+	output += getTable(m)
+	output += getFooter()
+
+	return output
 }
 
 // TODO(evgheni): if no path is specified try the current directory.
