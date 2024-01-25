@@ -265,7 +265,7 @@ func getTable(m model) string {
 
 	// Render table headers
 	tabStrings.WriteString(fmt.Sprintf(
-		"%-5s %-*s %-*s %-*s\n",
+		"%-5s %-*s  %-*s  %-*s\n",
 		"",
 		maxLen, "Worktree",
 		maxLen, "Branch",
@@ -289,7 +289,7 @@ func getTable(m model) string {
 		// Render the row
 		tabStrings.WriteString(
 			fmt.Sprintf(
-				"%s [%s] %-*s %-*s %-*s\n",
+				"%s [%s] %-*s  %-*s  %-*s\n",
 				cursor, checked,
 				maxLen, worktree.name,
 				maxLen, worktree.branch,
