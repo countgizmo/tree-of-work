@@ -8,7 +8,6 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"text/tabwriter"
 
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -222,13 +221,23 @@ func getHeader(m model) string {
 	return fmt.Sprintf("Your worktrees: [%d/%d]\n\n", current, len(m.worktrees))
 }
 
-// BUG: When testing on real bare repo some names are too long
-// Try truncating after max len
-// Add i command for info to get more info
-// Maybe it's time to switch to using Bubbles components
+func getLongestLen(m model) int {
+	result := 10 // length of a date string like 2000-10-10
+	for _, tree := range m.worktrees {
+		if len(tree.name) > result {
+			result = len(tree.name)
+		}
+
+		if len(tree.branch) > result {
+			result = len(tree.branch)
+		}
+	}
+
+	return result
+}
+
 func getTable(m model) string {
 	var tabStrings strings.Builder
-	tableWriter := tabwriter.NewWriter(&tabStrings, 0, 4, 0, '\t', 0)
 
 	rows, _ := getTerminalSize()
 	dataRows := rows - 5
@@ -246,8 +255,15 @@ func getTable(m model) string {
 		}
 	}
 
+	maxLen := getLongestLen(m)
+
 	// Render table headers
-	fmt.Fprint(tableWriter, "      Worktrees\tBranch names\tModified at\t\n")
+	tabStrings.WriteString(fmt.Sprintf(
+		"%-5s %-*s %-*s %-*s\n",
+		"",
+		maxLen, "Worktree",
+		maxLen, "Branch",
+		maxLen, "Modified at"))
 
 	for i := start; i < end; i++ {
 		worktree := m.worktrees[i]
@@ -265,9 +281,15 @@ func getTable(m model) string {
 		}
 
 		// Render the row
-		fmt.Fprintf(tableWriter, "%s [%s] %s\t%s\t%s\t\n", cursor, checked, worktree.name, worktree.branch, worktree.modifiedAt)
+		tabStrings.WriteString(
+			fmt.Sprintf(
+				"%s [%s] %-*s %-*s %-*s\n",
+				cursor, checked,
+				maxLen, worktree.name,
+				maxLen, worktree.branch,
+				maxLen, worktree.modifiedAt))
 	}
-	tableWriter.Flush()
+
 	return tabStrings.String()
 }
 
