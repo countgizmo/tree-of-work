@@ -28,12 +28,13 @@ func (a ByModifiedAt) Less(i, j int) bool { return a[i].modifiedAt < a[j].modifi
 func issueCommand(command string, args []string) ([]string, error) {
 	cmd := exec.Command(command, args...)
 
-	out, err := cmd.Output()
+	out, err := cmd.CombinedOutput()
+	lines := strings.Split(string(out), "\n")
+
 	if err != nil {
-		return nil, err
+		return lines, err
 	}
 
-	lines := strings.Split(string(out), "\n")
 	return lines, nil
 }
 
@@ -62,7 +63,7 @@ type model struct {
 	worktrees    map[int]worktree
 	cursor       int
 	selected     map[int]struct{}
-	err          error
+	errMsg       string
 }
 
 func initialModel(bareRepoPath string) model {
@@ -80,27 +81,31 @@ func initialModel(bareRepoPath string) model {
 }
 
 type deleteMsg int
-type errMsg struct{ err error }
+type errMsg struct {
+	err error
+	msg string
+}
 type listMsg map[int]worktree
 
 func (e errMsg) Error() string {
 	return e.err.Error()
 }
 
+// TODO(evgheni): implement FORCE deletea for capital D maybe
 func deleteTrees(m model) tea.Cmd {
 	return func() tea.Msg {
 		for k := range m.selected {
 			tree := m.worktrees[k]
 			removeWorktree := []string{"-C", m.bareRepoPath, "worktree", "remove", tree.name}
-			_, removeErr := issueCommand(m.gitPath, removeWorktree)
+			removeOut, removeErr := issueCommand(m.gitPath, removeWorktree)
 			if removeErr != nil {
-				return errMsg{removeErr}
+				return errMsg{removeErr, removeOut[0]}
 			}
 
 			removeBranch := []string{"-C", m.bareRepoPath, "branch", "-d", tree.branch}
-			_, removeBranchErr := issueCommand(m.gitPath, removeBranch)
+			removeBranchOut, removeBranchErr := issueCommand(m.gitPath, removeBranch)
 			if removeBranchErr != nil {
-				return errMsg{removeBranchErr}
+				return errMsg{removeBranchErr, removeBranchOut[0]}
 			}
 		}
 
@@ -114,7 +119,7 @@ func listTrees(git string, bareRepoPath string) tea.Cmd {
 		output, err := issueCommand(git, worktreeList)
 
 		if err != nil {
-			return errMsg{err}
+			return errMsg{err, output[0]}
 		}
 
 		worktrees := make(map[int]worktree, len(output)-2)
@@ -140,7 +145,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 
 	case errMsg:
-		m.err = msg
+		m.errMsg = msg.msg
 
 	case listMsg:
 		m.worktrees = msg
@@ -160,6 +165,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch msg.String() {
 
 		case "r":
+			m.errMsg = ""
 			return m, listTrees(m.gitPath, m.bareRepoPath)
 
 		case "d":
@@ -218,7 +224,7 @@ func getHeader(m model) string {
 		current = 0
 	}
 
-	return fmt.Sprintf("Your worktrees: [%d/%d]\n\n", current, len(m.worktrees))
+	return fmt.Sprintf("\nYour worktrees: [%d/%d]\n\n", current, len(m.worktrees))
 }
 
 func getLongestLen(m model) int {
@@ -297,12 +303,18 @@ func getFooter() string {
 	return "\nq: Quit, Enter/Space: Select, d: Delete, r: Refresh\n"
 }
 
-func (m model) View() string {
-	if m.err != nil {
-		return fmt.Sprintf("\nWe had some trouble: %v\n\n", m.err)
+func getError(m model) string {
+	if m.errMsg != "" {
+		return fmt.Sprintf("\tERROR: %s\n\n", m.errMsg)
 	}
 
+	return ""
+}
+
+func (m model) View() string {
+
 	output := getHeader(m)
+	output += getError(m)
 	output += getTable(m)
 	output += getFooter()
 
