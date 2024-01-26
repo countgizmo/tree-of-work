@@ -92,11 +92,16 @@ func (e errMsg) Error() string {
 }
 
 // TODO(evgheni): implement FORCE deletea for capital D maybe
-func deleteTrees(m model) tea.Cmd {
+func deleteTrees(m model, force bool) tea.Cmd {
 	return func() tea.Msg {
 		for k := range m.selected {
 			tree := m.worktrees[k]
 			removeWorktree := []string{"-C", m.bareRepoPath, "worktree", "remove", tree.name}
+
+			if force {
+				removeWorktree = append(removeWorktree, "--force")
+			}
+
 			removeOut, removeErr := issueCommand(m.gitPath, removeWorktree)
 			if removeErr != nil {
 				return errMsg{removeErr, removeOut[0]}
@@ -169,19 +174,30 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, listTrees(m.gitPath, m.bareRepoPath)
 
 		case "d":
+			m.errMsg = ""
 			return m, tea.Sequence(
-				deleteTrees(m),
-				listTrees(m.gitPath, m.bareRepoPath))
+				deleteTrees(m, false),
+				listTrees(m.gitPath, m.bareRepoPath),
+			)
+
+		case "D":
+			m.errMsg = ""
+			return m, tea.Sequence(
+				deleteTrees(m, true),
+				listTrees(m.gitPath, m.bareRepoPath),
+			)
 
 		case "ctrl+c", "q":
 			return m, tea.Quit
 
 		case "up", "k":
+			m.errMsg = ""
 			if m.cursor > 0 {
 				m.cursor--
 			}
 
 		case "down", "j":
+			m.errMsg = ""
 			if m.cursor < len(m.worktrees)-1 {
 				m.cursor++
 			}
@@ -189,6 +205,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// The "enter" key and the spacebar (a literal space) toggle
 		// the selected state for the item that the cursor is pointing at.
 		case "enter", " ":
+			m.errMsg = ""
 			_, ok := m.selected[m.cursor]
 			if ok {
 				delete(m.selected, m.cursor)
@@ -300,7 +317,7 @@ func getTable(m model) string {
 }
 
 func getFooter() string {
-	return "\nq: Quit, Enter/Space: Select, d: Delete, r: Refresh\n"
+	return "\nq: Quit, Enter/Space: Select, d: Delete, D: Force Delete, r: Refresh\n"
 }
 
 func getError(m model) string {
@@ -308,7 +325,7 @@ func getError(m model) string {
 		return fmt.Sprintf("\tERROR: %s\n\n", m.errMsg)
 	}
 
-	return ""
+	return "\n\n"
 }
 
 func (m model) View() string {
