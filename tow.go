@@ -91,7 +91,6 @@ func (e errMsg) Error() string {
 	return e.err.Error()
 }
 
-// TODO(evgheni): implement FORCE deletea for capital D maybe
 func deleteTrees(m model, force bool) tea.Cmd {
 	return func() tea.Msg {
 		for k := range m.selected {
@@ -338,13 +337,6 @@ func (m model) View() string {
 	return output
 }
 
-// TODO(evgheni): if no path is specified try the current directory.
-//
-//	If it's not a bare directory _than_ print out the usage.
-//	Also update the usage message then.
-//
-// This can be useful if the tow is in path and you are in your bare repo already
-// instead of calling `git worktree` you call `tow` and that's it.
 func usage() {
 	fmt.Println("Usage: tree-of-work <path-to-bare-repo>")
 }
