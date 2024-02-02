@@ -1,5 +1,12 @@
 # Tree of Work
 
+This small TUI program allows to list and delete Git worktrees in a bare repo.
+
+I found myself needing this because during my daily work I tend to accumulate worktrees and related branches quickly.
+Cleaning them has always been a pain though: I needed to manually delete the worktree and then delete the related branch.
+
+BEWARE: when you use the delete function it deletes both the worktree and the local branch without an easy way to restore them.
+
 ## How to build a release version
 
 Run `./release.sh`. You will get a `tow` executable.
